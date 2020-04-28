@@ -72,6 +72,60 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-webpack使用raw-loader内联静态资源失效" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2020/04/28/webpack%E4%BD%BF%E7%94%A8raw-loader%E5%86%85%E8%81%94%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E5%A4%B1%E6%95%88/" class="article-date">
+  <time datetime="2020-04-28T14:09:43.000Z" itemprop="datePublished">2020-04-28</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/04/28/webpack%E4%BD%BF%E7%94%A8raw-loader%E5%86%85%E8%81%94%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E5%A4%B1%E6%95%88/">webpack使用raw-loader内联静态资源失效</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>##1. webpack使用raw-loader内联静态资源失效</p>
+<h4 id="失效代码"><a href="#失效代码" class="headerlink" title="失效代码"></a>失效代码</h4><figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="javascript">$&#123; <span class="built_in">require</span>(<span class="string">'raw-loader!babel-loader!./page/demo.js'</span>) &#125;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<h4 id="原因及解决办法"><a href="#原因及解决办法" class="headerlink" title="原因及解决办法"></a>原因及解决办法</h4><p>由于html-webpack-plugin解析语法的改变，将<code>${ &quot;code&quot; }</code>写法改为了<code>&lt;%= &quot;code&quot; %&gt;</code><br>将原有的写法改为新写法即可</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!--由于html-webpack-plugin解析语法的改变，将$&#123; "代码" &#125;标识符改为了&lt;%= "代码" %&gt;--&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="javascript">&lt;%=<span class="built_in">require</span>(<span class="string">'raw-loader!babel-loader!./page/demo.js'</span>)%&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p>顺便说一下<code>raw-loader@0.5.1</code>，对比了一下raw-loader新版本的源码。发现问题出在导出语法上。<br>新版本的raw-loader，<a href="https://www.npmjs.com/package/raw-loader" target="_blank" rel="noopener">默认情况下，raw-loader生成使用ES模块语法的JS模块</a>。</p>
+<ul>
+<li>老版本 0.5.1 <figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">module</span>.exports = <span class="function"><span class="keyword">function</span>(<span class="params">content</span>) </span>&#123;</span><br><span class="line">	<span class="keyword">this</span>.cacheable &amp;&amp; <span class="keyword">this</span>.cacheable();</span><br><span class="line">	<span class="keyword">this</span>.value = content;</span><br><span class="line">	<span class="comment">// 0.5.1导出方式</span></span><br><span class="line">	<span class="keyword">return</span> <span class="string">"module.exports = "</span> + <span class="built_in">JSON</span>.stringify(content);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>新版本<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">rawLoader</span>(<span class="params">source</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> options = (<span class="number">0</span>, _loaderUtils.getOptions)(<span class="keyword">this</span>);</span><br><span class="line">  (<span class="number">0</span>, _schemaUtils.default)(_options.default, options, &#123;</span><br><span class="line">    name: <span class="string">'Raw Loader'</span>,</span><br><span class="line">    baseDataPath: <span class="string">'options'</span></span><br><span class="line">  &#125;);</span><br><span class="line">  <span class="keyword">const</span> json = <span class="built_in">JSON</span>.stringify(source).replace(<span class="regexp">/\u2028/g</span>, <span class="string">'\\u2028'</span>).replace(<span class="regexp">/\u2029/g</span>, <span class="string">'\\u2029'</span>);</span><br><span class="line">  <span class="comment">// 将true 改为false</span></span><br><span class="line">  <span class="keyword">const</span> esModule = <span class="keyword">typeof</span> options.esModule !== <span class="string">'undefined'</span> ? options.esModule : <span class="literal">true</span>;</span><br><span class="line">  <span class="comment">/*const esModule = typeof options.esModule !== 'undefined' ? options.esModule : false;*/</span></span><br><span class="line">  <span class="comment">// esModule 控制导出方式</span></span><br><span class="line">  <span class="keyword">return</span> <span class="string">`<span class="subst">$&#123;esModule ? <span class="string">'export default'</span> : <span class="string">'module.exports ='</span>&#125;</span> <span class="subst">$&#123;json&#125;</span>;`</span>; </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+兼容办法：在node_modules中找到<code>raw-loader/dist/index</code>中将esModule的默认值改为false即可<blockquote>
+<p>如图所示：<br><img src="https://img-blog.csdnimg.cn/20200425133908895.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MzcxMTkxNw==,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"></p>
+</blockquote>
+</li>
+</ul>
+</li>
+</ul>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2020/04/28/webpack%E4%BD%BF%E7%94%A8raw-loader%E5%86%85%E8%81%94%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E5%A4%B1%E6%95%88/" data-id="ck9jzmjgh0000z0ucbitbf4pc" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/webpack/" rel="tag">webpack</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-vue" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2020/04/27/vue/" class="article-date">
@@ -192,60 +246,11 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2020/04/27/vue/" data-id="ck9imvqqf0001k0uc62w41tx8" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2020/04/27/vue/" data-id="ck9jzmjh30003z0ucgv6jetn7" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/vue-%E6%BA%90%E7%A0%81/" rel="tag">vue, 源码</a></li></ul>
 
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-hello-world" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2020/04/26/hello-world/" class="article-date">
-  <time datetime="2020-04-26T14:32:58.514Z" itemprop="datePublished">2020-04-26</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2020/04/26/hello-world/">Hello World</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html" target="_blank" rel="noopener">Deployment</a></p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://yoursite.com/2020/04/26/hello-world/" data-id="ck9imvqpy0000k0uc4fdccptd" class="article-share-link">Share</a>
-      
-      
     </footer>
   </div>
   
@@ -266,7 +271,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/vue-%E6%BA%90%E7%A0%81/" rel="tag">vue, 源码</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/vue-%E6%BA%90%E7%A0%81/" rel="tag">vue, 源码</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/webpack/" rel="tag">webpack</a></li></ul>
     </div>
   </div>
 
@@ -276,7 +281,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">标签云</h3>
     <div class="widget tagcloud">
-      <a href="/tags/vue-%E6%BA%90%E7%A0%81/" style="font-size: 10px;">vue, 源码</a>
+      <a href="/tags/vue-%E6%BA%90%E7%A0%81/" style="font-size: 10px;">vue, 源码</a> <a href="/tags/webpack/" style="font-size: 10px;">webpack</a>
     </div>
   </div>
 
@@ -298,11 +303,11 @@
       <ul>
         
           <li>
-            <a href="/2020/04/27/vue/">vue</a>
+            <a href="/2020/04/28/webpack%E4%BD%BF%E7%94%A8raw-loader%E5%86%85%E8%81%94%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E5%A4%B1%E6%95%88/">webpack使用raw-loader内联静态资源失效</a>
           </li>
         
           <li>
-            <a href="/2020/04/26/hello-world/">Hello World</a>
+            <a href="/2020/04/27/vue/">vue</a>
           </li>
         
       </ul>
